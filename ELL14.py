@@ -6,48 +6,50 @@ from thorlabs_elliptec import ELLx
 from serial import SerialException
 
 class ELL14(Device):
-    """
-    ELL14
-    This controls an  ELL14 - Rotation Mount
+    """ELL14
+
+    Tango Device Server for controlling a Thorlabs ELL14
+    Rotation Mount
     """
 
-    Port = device_property(dtype='str')
-    Address = device_property(dtype='int')
+    Port = device_property(dtype='str', doc='Serial port of the ELL14 controller')
+    Address = device_property(dtype='int', doc='Address of the ELL14 axis')
+
     position = attribute(
-        min_value = 0.0,
-        max_value = 360.0,
+        min_value=0.0,
+        max_value=360.0,
         dtype='float',
         access=AttrWriteType.READ_WRITE,
-        label="Position",
-        unit="degree",
-        format="%6.3f",
-        doc = 'absolute position in degrees'
+        label='Position',
+        unit='degree',
+        format='%6.3f',
+        doc='absolute position in degree',
     )
-    num_operations = attribute(
-        min_value = 0,
-        max_warning = 10000,
-        dtype='int',
-        label = "Number of Movements",
-        format = "%5.0f",
-        doc= "Number of movements since last Swipe operation",
-        )
-    
 
+    num_operations = attribute(
+        min_value=0,
+        max_warning=10000,
+        dtype='int',
+        label='Number of Movements',
+        format='%5.0f',
+        doc='Number of movements since last Swipe operation',
+        )
 
     def init_device(self):
         Device.init_device(self)
         self.set_state(DevState.INIT)
-        self.counter = 0
+        self._counter = 0
         try:
             self.stage = ELLx(serial_port=self.Port)
-            self.info_stream(f'Connected to Port {self.Port}')
+            self.info_stream('Connected to Port {:s}'.format(self.Port))
             self.set_state(DevState.ON)
         except SerialException:
-            self.error_stream(f'Cannot connect on Port {self.Port}')
+            self.error_stream('Cannot connect on Port {:s}'.format(self.Port))
             self.set_state(DevState.FAULT)
 
     def delete_device(self):
         self.stage.close()
+        self.info_stream('Closed connection on Port {:s}'.format(self.Port))
 
     def always_executed_hook(self):
         info = ""
@@ -55,48 +57,40 @@ class ELL14(Device):
             info = "PLEASE EXECUTE SWIPE OPERATION!!!"
         if self.stage.is_moving():
             self.set_state(DevState.MOVING)
-            info += "\nThe divice Status is MOVING"
+            info += "\nThe device is MOVING"
         else:
             self.set_state(DevState.ON)
-            info += "\nThe divice Status is ON"
+            info += "\nThe device is ON"
         self.set_status(info)
 
-
     def read_position(self):
-        '''reads position of motor'''
-        self.position = self.stage.get_position()
-        return self.position
+        return self.stage.get_position()
         
-    @DebugIt()
     def write_position(self, value):
-        '''moves motor to given position'''
         self.stage.move_absolute(value)
         self.set_state(DevState.MOVING)
-        self.counter +=1
+        self._counter +=1
 
     def read_num_operations(self):
-        '''gives back the operations sice last swipe'''
-        return self.counter
+        return self._counter   
 
-    
-
-    @command()
-    def homing(self):  
-        '''Brings the motor to position 0.'''      
+    @command
+    def homing(self):      
         self.stage.home()
         self.set_state(DevState.MOVING)
         self.counter +=1
     
-    @command()
+    @command
     def swipe(self):
-        '''
+        """swipe
+    
         Executes a swipe move over the full range of motion as 
         required every 10000 operations (see user manual section 4.4).
-        '''
-        self.stage.move_relative(270.)
-        self.stage.move_relative(-540.)
-        self.stage.move_relative(270.)
-        self.counter = 0 
+        """
+        self.stage.move_absolute(0.)
+        self.stage.move_abolute(359.)
+        self.stage.move_absolute(0.)
+        self._counter = 0 
 
 
 # start the server
