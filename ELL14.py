@@ -50,6 +50,9 @@ class ELL14(Device):
             self.error_stream('Cannot connect on Port {:s}'.format(self.Port))
             self.set_state(DevState.FAULT)
 
+    def delete_device(self):
+        self.stage.close()
+
     def always_executed_hook(self):
         info = ""
         if self.counter > 10000:
@@ -80,13 +83,20 @@ class ELL14(Device):
     
 
     @command()
-    def Homing(self):        
+    def Homing(self):  
+        '''
+        Brings the motor to position 0.
+        '''      
         self.stage.home()
         self.set_state(DevState.MOVING)
         self.counter +=1
     
     @command()
     def Swipe(self):
+        '''
+        Executes a swipe move over the full range of motion as 
+        required every 10000 operations (see user manual section 4.4).
+        '''
         self.stage.move_relative(270.)
         self.stage.move_relative(-540.)
         self.stage.move_relative(270.)
