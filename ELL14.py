@@ -2,21 +2,17 @@
 
 from tango import AttrWriteType, DevState, DebugIt
 from tango.server import Device, attribute, command, device_property
-
-from thorlabs_elliptec import ELLx, ELLError, ELLStatus, list_devices
-
+from thorlabs_elliptec import ELLx
+from serial import SerialException
 
 class ELL14(Device):
-    """ELL14
+    """
+    ELL14
     This controls an  ELL14 - Rotation Mount
     """
-    
+
     Port = device_property(dtype='str')
     Address = device_property(dtype='int')
-    
-    
-
-    
     position = attribute(
         min_value = 0.0,
         max_value = 360.0,
@@ -27,7 +23,7 @@ class ELL14(Device):
         format="%6.3f",
         doc = 'absolute position in degrees'
     )
-    numOperations = attribute(
+    num_operations = attribute(
         min_value = 0,
         max_warning = 10000,
         dtype='int',
@@ -44,10 +40,10 @@ class ELL14(Device):
         self.counter = 0
         try:
             self.stage = ELLx(serial_port=self.Port)
-            self.info_stream('Connected to Port {:s}'.format(self.Port))
+            self.info_stream(f'Connected to Port {self.Port}')
             self.set_state(DevState.ON)
-        except:
-            self.error_stream('Cannot connect on Port {:s}'.format(self.Port))
+        except SerialException:
+            self.error_stream(f'Cannot connect on Port {self.Port}')
             self.set_state(DevState.FAULT)
 
     def delete_device(self):
@@ -67,32 +63,32 @@ class ELL14(Device):
 
 
     def read_position(self):
+        '''reads position of motor'''
         self.position = self.stage.get_position()
         return self.position
         
     @DebugIt()
     def write_position(self, value):
+        '''moves motor to given position'''
         self.stage.move_absolute(value)
         self.set_state(DevState.MOVING)
         self.counter +=1
 
-    def read_numOperations(self):
-        
+    def read_num_operations(self):
+        '''gives back the operations sice last swipe'''
         return self.counter
 
     
 
     @command()
-    def Homing(self):  
-        '''
-        Brings the motor to position 0.
-        '''      
+    def homing(self):  
+        '''Brings the motor to position 0.'''      
         self.stage.home()
         self.set_state(DevState.MOVING)
         self.counter +=1
     
     @command()
-    def Swipe(self):
+    def swipe(self):
         '''
         Executes a swipe move over the full range of motion as 
         required every 10000 operations (see user manual section 4.4).
