@@ -1,1 +1,0 @@
-Python librarys required for running this Tango device server are pytango, thorlabs_elliptec.
