@@ -40,7 +40,7 @@ class ELL14(Device):
         self.set_state(DevState.INIT)
         self._counter = 0
         try:
-            self.stage = ELLx(serial_port=self.Port)
+            self.stage = ELLx(serial_port=self.Port, device_id=self.Address)
             self.info_stream('Connected to Port {:s}'.format(self.Port))
             self.set_state(DevState.ON)
         except SerialException:
@@ -53,7 +53,7 @@ class ELL14(Device):
 
     def always_executed_hook(self):
         info = ""
-        if self.counter > 10000:
+        if self._counter > 10000:
             info = "PLEASE EXECUTE SWIPE OPERATION!!!"
         if self.stage.is_moving():
             self.set_state(DevState.MOVING)
@@ -78,7 +78,7 @@ class ELL14(Device):
     def homing(self):      
         self.stage.home()
         self.set_state(DevState.MOVING)
-        self.counter +=1
+        self._counter +=1
     
     @command
     def swipe(self):
@@ -88,11 +88,12 @@ class ELL14(Device):
         required every 10000 operations (see user manual section 4.4).
         """
         self.stage.move_absolute(0.)
-        self.stage.move_abolute(359.)
+        self.stage.move_absolute(359.)
         self.stage.move_absolute(0.)
-        self._counter = 0 
+        self._counter=0 
 
 
 # start the server
 if __name__ == '__main__':
     ELL14.run_server()
+    
