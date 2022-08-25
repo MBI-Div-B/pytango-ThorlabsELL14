@@ -80,7 +80,7 @@ class ELL14(Device):
         label="Number of movements",
         format="%5.0f",
         min_value=0,
-        max_warning=10,
+        max_warning=10000,
         doc="Number of movements sice last swipe command",
     )
 
@@ -110,7 +110,7 @@ class ELL14(Device):
         """Method always executed before any TANGO command is executed."""
         # PROTECTED REGION ID(ELL14.always_executed_hook) ENABLED START #
         info = ""
-        if self.read_num_operations() > 10:
+        if self.read_num_operations() > 10000:
             info = "PLEASE EXECUTE SWIPE OPERATION!!!"
         if self.stage.is_moving():
             self.set_state(DevState.MOVING)
