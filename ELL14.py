@@ -12,16 +12,15 @@
 """
 
 # PyTango imports
-from ast import Num
-from contextlib import nullcontext
+
 import tango
 from tango import DebugIt
 from tango.server import run
 from tango.server import Device
 from tango.server import attribute, command
 from tango.server import device_property
-from tango import AttrQuality, DispLevel, DevState
-from tango import AttrWriteType, PipeWriteType
+from tango import DevState
+from tango import AttrWriteType
 
 # Additional import
 # PROTECTED REGION ID(ELL14.additionnal_import) ENABLED START #
@@ -147,8 +146,12 @@ class ELL14(Device):
         """Set the position attribute."""
         self.stage.move_absolute(value)
         self.set_state(DevState.MOVING)
+        # writing to  db of device the device and increasing __value by one
         self.db.put_device_attribute_property(self.dev_name,{'num_operations':{'__value':
-            str(int(self.db.get_device_attribute_property(self.dev_name,'num_operations')['num_operations']['__value'][0])+1)}})  #writing to  db of device the device and increasing __value by one
+            str(int(self.db.get_device_attribute_property(
+                self.dev_name,'num_operations')['num_operations']['__value'][0])+1
+                )}}
+            )  
         # PROTECTED REGION END #    //  ELL14.position_write
 
     def read_num_operations(self):
