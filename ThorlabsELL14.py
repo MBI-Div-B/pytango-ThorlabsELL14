@@ -83,6 +83,9 @@ class ThorlabsELL14(Device):
         self.dev_name = self.get_name()
         self.db = tango.Database()
         self.set_state(DevState.INIT)
+        self._num_operations = int(self.db.get_device_attribute_property(
+                    self.dev_name,'num_operations')['num_operations']['__value'][0]
+                )
         try:
             self.stage = ELLx(serial_port=self.Port, device_id=self.Address)
             self.info_stream('Connected to Port {:s}'.format(self.Port))
@@ -96,7 +99,7 @@ class ThorlabsELL14(Device):
         """Method always executed before any TANGO command is executed."""
         # PROTECTED REGION ID(ThorlabsELL14.always_executed_hook) ENABLED START #
         info = ""
-        if self.read_num_operations() > 10000:
+        if self._num_operations > 10000:
             info = "PLEASE EXECUTE SWIPE OPERATION!!!"
         if self.stage.is_moving():
             self.set_state(DevState.MOVING)
@@ -115,6 +118,9 @@ class ThorlabsELL14(Device):
         destructor and by the device Init command.
         """
         # PROTECTED REGION ID(ThorlabsELL14.delete_device) ENABLED START #
+        self.db.put_device_attribute_property(
+            self.dev_name,{'num_operations':{'__value':str(self._num_operations)}}
+        )
         self.stage.close()
         self.info_stream('Closed connection on Port {:s}'.format(self.Port))
         # PROTECTED REGION END #    //  ThorlabsELL14.delete_device
@@ -134,19 +140,13 @@ class ThorlabsELL14(Device):
         self.stage.move_absolute(value)
         self.set_state(DevState.MOVING)
         # writing to  db of device the device and increasing __value by one
-        self.db.put_device_attribute_property(self.dev_name,{'num_operations':{'__value':
-            str(int(self.db.get_device_attribute_property(
-                self.dev_name,'num_operations')['num_operations']['__value'][0])+1
-                )}}
-        )
+        self._num_operations += 1
         # PROTECTED REGION END #    //  ThorlabsELL14.position_write
 
     def read_num_operations(self):
         # PROTECTED REGION ID(ThorlabsELL14.num_operations_read) ENABLED START #
         """Return the num_operations attribute."""
-        return  int(self.db.get_device_attribute_property(
-                    self.dev_name,'num_operations')['num_operations']['__value'][0]
-                ) # reads the value of __vlaue of attribue num_operations of the device
+        return self._num_operations  # reads the value of __vlaue of attribue num_operations of the device
         # PROTECTED REGION END #    //  ThorlabsELL14.num_operations_read
 
     # --------
@@ -161,11 +161,7 @@ class ThorlabsELL14(Device):
         self.stage.home()
         self.set_state(DevState.MOVING)
         #writing to  db of the device and increasing __value by one
-        self.db.put_device_attribute_property(
-            self.dev_name,{'num_operations':{'__value':
-                str(int(self.db.get_device_attribute_property(
-                    self.dev_name,'num_operations')['num_operations']['__value'][0])+1)}}
-        )
+        self._num_operations += 1
         # PROTECTED REGION END #    //  ThorlabsELL14.homing
 
     @command()
@@ -183,9 +179,7 @@ class ThorlabsELL14(Device):
         self.stage.move_absolute(359.)
         self.stage.move_absolute(0.)
         #writing to  db of the device
-        self.db.put_device_attribute_property(
-            self.dev_name,{'num_operations':{'__value':'0'}}
-        )
+        self._num_operations = 0
             # PROTECTED REGION END #    //  ThorlabsELL14.swipe
 
 # ----------
