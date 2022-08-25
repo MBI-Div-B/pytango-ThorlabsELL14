@@ -80,7 +80,7 @@ class ELL14(Device):
         label="Number of movements",
         format="%5.0f",
         min_value=0,
-        max_warning=10000,
+        max_warning=10,
         doc="Number of movements sice last swipe command",
     )
 
@@ -96,7 +96,7 @@ class ELL14(Device):
         self.dev_name = self.get_name()
         self.db = tango.Database()
         self.set_state(DevState.INIT)
-        self._counter = 0 
+        
         try:
             self.stage = ELLx(serial_port=self.Port, device_id=self.Address)
             self.info_stream('Connected to Port {:s}'.format(self.Port))
@@ -110,7 +110,7 @@ class ELL14(Device):
         """Method always executed before any TANGO command is executed."""
         # PROTECTED REGION ID(ELL14.always_executed_hook) ENABLED START #
         info = ""
-        if self._counter > 10000:
+        if self.read_num_operations() > 10:
             info = "PLEASE EXECUTE SWIPE OPERATION!!!"
         if self.stage.is_moving():
             self.set_state(DevState.MOVING)
