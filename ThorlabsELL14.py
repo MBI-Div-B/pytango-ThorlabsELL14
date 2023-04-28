@@ -84,7 +84,7 @@ class ThorlabsELL14(Device):
         self.db = tango.Database()
         self.set_state(DevState.INIT)
         self._num_operations = int(self.db.get_device_attribute_property(
-                    self.dev_name,'num_operations')['num_operations']['__value'][0]
+                    self.dev_name, 'num_operations')['num_operations']['__value'][0]
                 )
         try:
             self.stage = ELLx(serial_port=self.Port, device_id=self.Address)
@@ -119,7 +119,7 @@ class ThorlabsELL14(Device):
         """
         # PROTECTED REGION ID(ThorlabsELL14.delete_device) ENABLED START #
         self.db.put_device_attribute_property(
-            self.dev_name,{'num_operations':{'__value':str(self._num_operations)}}
+            self.dev_name, {'num_operations': {'__value': str(self._num_operations)}}
         )
         self.stage.close()
         self.info_stream('Closed connection on Port {:s}'.format(self.Port))
