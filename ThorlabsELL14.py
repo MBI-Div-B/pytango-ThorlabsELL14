@@ -1,6 +1,5 @@
-#!/usr/bin/python3 -u
-
-# PyTango imports
+#!/usr/bin/env python3
+#
 
 import tango
 from tango import DebugIt
@@ -11,41 +10,26 @@ from tango.server import device_property
 from tango import DevState
 from tango import AttrWriteType
 
-# Additional import
-# PROTECTED REGION ID(ThorlabsELL14.additionnal_import) ENABLED START #
-from thorlabs_elliptec import ELLx
+#from thorlabs_elliptec import ELLx
+from ELL14 import ELL14
 from serial import SerialException
-# PROTECTED REGION END #    //  ThorlabsELL14.additionnal_import
+import serial
+import time
 
 __all__ = ["ThorlabsELL14", "main"]
 
 
 class ThorlabsELL14(Device):
     """
-
-    **Properties:**
-
-    - Device Property
-        Port
-            - Serial port of the ThorlabsELL14 controller
-            - Type:'DevString'
-        Address
-            - Address of the ThorlabsELL14 axis
-            - Type:'DevShort'
+    This is a Tango device server for a Thorlabs ELL14 rotation stage.
     """
-    # PROTECTED REGION ID(ThorlabsELL14.class_variable) ENABLED START #
-    # PROTECTED REGION END #    //  ThorlabsELL14.class_variable
 
     # -----------------
     # Device Properties
     # -----------------
 
-    Port = device_property(
+    SerialNum = device_property(
         dtype='DevString',
-    )
-
-    Address = device_property(
-        dtype='DevShort',
     )
 
     # ----------
@@ -57,19 +41,32 @@ class ThorlabsELL14(Device):
         access=AttrWriteType.READ_WRITE,
         label="Position",
         unit="degree",
-        format="%6.3f",
-        max_value=360,
-        min_value=0,
+        format="%5.2f",
         doc="absolute position in degree",
+        fget = "read_position",
+        fset = "write_position",
     )
 
-    num_operations = attribute(
-        dtype='DevULong',
-        label="Number of movements",
-        format="%5.0f",
+    velocity = attribute(
+        dtype='DevFloat',
+        access=AttrWriteType.READ_WRITE,
+        label="Velocity",
+        unit="arb. u.",
+        doc="velocity between 0 and 64",
         min_value=0,
-        max_warning=10000,
-        doc="Number of movements sice last swipe command",
+        fget = "get_vel",
+        fset = "set_vel",
+    )
+
+    home = attribute(
+        dtype='DevFloat',
+        access=AttrWriteType.READ_WRITE,
+        label="Home",
+        unit="degree",
+        format="%5.2f",
+        doc="home position in degree",
+        fget = "get_homeoffset",
+        fset = "set_homeoffset",
     )
 
     # ---------------
@@ -77,30 +74,30 @@ class ThorlabsELL14(Device):
     # ---------------
 
     def init_device(self):
+        
+        self._pp = 143360 #Number of steps per revolution (see manual Ch. 6)
         """Initialises the attributes and properties of the ThorlabsELL14."""
         Device.init_device(self)
-        # PROTECTED REGION ID(ThorlabsELL14.init_device) ENABLED START #
-        self.dev_name = self.get_name()
+        self._serial = self.SerialNum
         self.db = tango.Database()
         self.set_state(DevState.INIT)
-        self._num_operations = int(self.db.get_device_attribute_property(
-                    self.dev_name, 'num_operations')['num_operations']['__value'][0]
-                )
         try:
-            self.stage = ELLx(serial_port=self.Port, device_id=self.Address)
-            self.info_stream('Connected to Port {:s}'.format(self.Port))
+            self.stage = ELL14(serial_number = self._serial)
+            self.info_stream('Connected to Device {:s}'.format(self._serial))
+            print(self._serial)
+            self.init_params()
             self.set_state(DevState.ON)
         except SerialException:
-            self.error_stream('Cannot connect on Port {:s}'.format(self.Port))
+            self.error_stream('Cannot connect to Device {:s}'.format(self._serial))
             self.set_state(DevState.FAULT)
-        # PROTECTED REGION END #    //  ThorlabsELL14.init_device
 
+    def init_params(self):
+        time.sleep(1)
+        self.swipe()
+        
     def always_executed_hook(self):
         """Method always executed before any TANGO command is executed."""
-        # PROTECTED REGION ID(ThorlabsELL14.always_executed_hook) ENABLED START #
         info = ""
-        if self._num_operations > 10000:
-            info = "PLEASE EXECUTE SWIPE OPERATION!!!"
         if self.stage.is_moving():
             self.set_state(DevState.MOVING)
             info += "\nThe device is MOVING"
@@ -108,7 +105,6 @@ class ThorlabsELL14(Device):
             self.set_state(DevState.ON)
             info += "\nThe device is ON"
         self.set_status(info)
-        # PROTECTED REGION END #    //  ThorlabsELL14.always_executed_hook
 
     def delete_device(self):
         """Hook to delete resources allocated in init_device.
@@ -117,71 +113,71 @@ class ThorlabsELL14(Device):
         init_device method to be released.  This method is called by the device
         destructor and by the device Init command.
         """
-        # PROTECTED REGION ID(ThorlabsELL14.delete_device) ENABLED START #
-        self.db.put_device_attribute_property(
-            self.dev_name, {'num_operations': {'__value': str(self._num_operations)}}
-        )
         self.stage.close()
-        self.info_stream('Closed connection on Port {:s}'.format(self.Port))
-        # PROTECTED REGION END #    //  ThorlabsELL14.delete_device
+        self.info_stream('Closed connection to Device {:s}'.format(serial))
+
     # ------------------
     # Attributes methods
     # ------------------
 
     def read_position(self):
-        # PROTECTED REGION ID(ThorlabsELL14.position_read) ENABLED START #
-        """Return the position attribute."""
-        return self.stage.get_position()
-        # PROTECTED REGION END #    //  ThorlabsELL14.position_read
+        #get the position attribute.
+        return round(self.stage.get_position(),2)
 
     def write_position(self, value):
-        # PROTECTED REGION ID(ThorlabsELL14.position_write) ENABLED START #
-        """Set the position attribute."""
-        self.stage.move_absolute(value)
+        #Set the position attribute.
+        self.stage.move_absolute((value)%360.0, blocking = True)
         self.set_state(DevState.MOVING)
-        # writing to  db of device the device and increasing __value by one
-        self._num_operations += 1
-        # PROTECTED REGION END #    //  ThorlabsELL14.position_write
 
-    def read_num_operations(self):
-        # PROTECTED REGION ID(ThorlabsELL14.num_operations_read) ENABLED START #
-        """Return the num_operations attribute."""
-        return self._num_operations  # reads the value of __vlaue of attribue num_operations of the device
-        # PROTECTED REGION END #    //  ThorlabsELL14.num_operations_read
+    def get_homeoffset(self):
+        #get home attribute.
+        return self.stage.get_home()
+    
+    def set_homeoffset(self,value):
+        #set home attribute.
+        value = value%360
+        self.stage._updatequeue.append(f"so{int(143360*value/360.0) & 0xffffffff:08X}")
+
+    def get_vel(self):
+        #get velocity attribute.
+        return self.stage.get_velocity()
+
+    def set_vel(self, value):
+        #Set the velocity attribute.
+        value = int(value)
+        if value <= 64:
+            self.stage._updatequeue.append('sv'+str(value))
+        else:
+            self.comm('sv64')
 
     # --------
     # Commands
     # --------
 
-    @command(
-    )
+    @command()
     @DebugIt()
     def homing(self):
-        # PROTECTED REGION ID(ThorlabsELL14.homing) ENABLED START #
-        self.stage.home()
+        self.stage.home(blocking = True)
         self.set_state(DevState.MOVING)
-        #writing to  db of the device and increasing __value by one
-        self._num_operations += 1
-        # PROTECTED REGION END #    //  ThorlabsELL14.homing
 
     @command()
     @DebugIt()
     def swipe(self):
-        # PROTECTED REGION ID(ThorlabsELL14.swipe) ENABLED START #
-        """
-            swipe
-                    Executes a swipe move over the full range of motion as
-                    required every 10000 operations (see user manual section 4.4).
-
-        :return:None
-        """
+        pos = self.read_position()
         self.stage.move_absolute(0.)
         self.stage.move_absolute(359.)
         self.stage.move_absolute(0.)
-        #writing to  db of the device
-        self._num_operations = 0
-            # PROTECTED REGION END #    //  ThorlabsELL14.swipe
+        self.write_position(pos)
 
+    @command(dtype_in = str, dtype_out = str)
+    def comm(self, comman):
+        return_data = str(self.stage._write_command(comman))
+        return return_data
+
+    @command(dtype_in = float)
+    def ShiftOffset(self, shift):
+        co = self.get_homeoffset()
+        self.set_homeoffset(co+shift)
 # ----------
 # Run server
 # ----------
@@ -189,9 +185,7 @@ class ThorlabsELL14(Device):
 
 def main(args=None, **kwargs):
     """Main function of the ThorlabsELL14 module."""
-    # PROTECTED REGION ID(ThorlabsELL14.main) ENABLED START #
     return run((ThorlabsELL14,), args=args, **kwargs)
-    # PROTECTED REGION END #    //  ThorlabsELL14.main
 
 
 if __name__ == '__main__':
